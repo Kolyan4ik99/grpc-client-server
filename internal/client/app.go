@@ -42,6 +42,9 @@ func (a *App) Start() error {
 		Password: a.cfg.Password,
 		Interval: a.cfg.DialInterval.Milliseconds(),
 	})
+	if err != nil {
+		return fmt.Errorf("server is not avaiable")
+	}
 
 	for {
 		val, err := cl.Recv()
