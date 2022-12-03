@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"time"
 
 	"grpc-client-server/internal/client"
 	"grpc-client-server/internal/config"
@@ -16,10 +15,8 @@ func main() {
 
 	cl := client.NewApp(cfg)
 
-	for {
-		err = cl.Start()
+	err = cl.Start()
+	if err != nil {
 		log.Println(err)
-		log.Println("Wait 10 second and try reconnect")
-		time.Sleep(time.Second * 10)
 	}
 }
