@@ -10,7 +10,7 @@ type Client struct {
 	Password string
 
 	DialInterval time.Duration
-	DialDeadline time.Time
+	DialDeadline time.Duration
 	Buffer       *buffer
 	ServerURL    string
 }
@@ -45,7 +45,7 @@ func NewClientConfig() (*Client, error) {
 		Password: *password,
 
 		DialInterval: dialInterval,
-		DialDeadline: time.Now().Add(dialDeadline),
+		DialDeadline: dialDeadline,
 		Buffer: &buffer{
 			Size:      *bufferSize,
 			Threshold: bufferThreshold,

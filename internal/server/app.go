@@ -11,33 +11,14 @@ import (
 )
 
 type App struct {
-	cfg *config.Server
-}
-
-func (a *App) AuthAndListen(info *rpc.Info, server rpc.Dialog_AuthAndListenServer) error {
-	fmt.Printf("password=%s, username=%s\n", info.Password, info.Name)
-	dur := time.Duration(info.Interval)
-	ticker := time.NewTicker(dur * time.Millisecond)
-	index := int64(1)
-
-	for {
-		select {
-		case <-ticker.C:
-			err := server.Send(&rpc.Value{Index: index})
-			if err != nil {
-				return err
-			}
-			index++
-
-		case <-server.Context().Done():
-			fmt.Printf("Client %s close connection\n", info.Name)
-			return nil
-		}
-	}
+	done chan struct{}
+	cfg  *config.Server
 }
 
 func NewApp(cfg *config.Server) *App {
-	return &App{cfg: cfg}
+	return &App{
+		done: make(chan struct{}),
+		cfg:  cfg}
 }
 
 func (a *App) Start() {
@@ -53,5 +34,32 @@ func (a *App) Start() {
 	err = s.Serve(listen)
 	if err != nil {
 		return
+	}
+}
+
+func (a *App) StopListen(_ *rpc.Empty, _ rpc.Dialog_StopListenServer) error {
+	a.done <- struct{}{}
+	return nil
+}
+
+func (a *App) Listen(info *rpc.Info, server rpc.Dialog_ListenServer) error {
+	fmt.Printf("password=%s, username=%s\n", info.Password, info.Name)
+	dur := time.Duration(info.Interval)
+	ticker := time.NewTicker(dur * time.Millisecond)
+	index := int64(1)
+
+	for {
+		select {
+		case <-ticker.C:
+			err := server.Send(&rpc.Value{Index: index})
+			if err != nil {
+				return err
+			}
+			index++
+
+		case <-a.done:
+			fmt.Printf("Client %s close connection\n", info.Name)
+			return nil
+		}
 	}
 }

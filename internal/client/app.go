@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,7 +30,6 @@ func NewApp(cfg *config.Client) *App {
 
 func (a *App) Start() error {
 	log.Println("Starting client application")
-	ctx, _ := context.WithDeadline(context.Background(), a.cfg.DialDeadline)
 
 	dial, err := grpc.Dial(a.cfg.ServerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -37,7 +38,27 @@ func (a *App) Start() error {
 	dialClient := rpc.NewDialogClient(dial)
 	log.Printf("Connection to server [%s]\n", a.cfg.ServerURL)
 
-	cl, err := dialClient.AuthAndListen(ctx, &rpc.Info{
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := a.listenAndPutToBuffer(dialClient)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	_, err = a.stopConnection(dialClient)
+	if err != nil {
+		return err
+	}
+	wg.Wait()
+
+	return nil
+}
+
+func (a *App) listenAndPutToBuffer(client rpc.DialogClient) error {
+	cl, err := client.Listen(context.Background(), &rpc.Info{
 		Name:     a.cfg.UserName,
 		Password: a.cfg.Password,
 		Interval: a.cfg.DialInterval.Milliseconds(),
@@ -55,4 +76,11 @@ func (a *App) Start() error {
 		go a.buffer.put(val.Index)
 		log.Printf("Put value=[%d] to buffer\n", val.Index)
 	}
+}
+
+func (a *App) stopConnection(client rpc.DialogClient) (rpc.Dialog_StopListenClient, error) {
+	log.Printf("Wait %s to stop connection", a.cfg.DialDeadline)
+	time.Sleep(a.cfg.DialDeadline)
+	log.Println("Connection successfully stopped")
+	return client.StopListen(context.Background(), &rpc.Empty{})
 }
