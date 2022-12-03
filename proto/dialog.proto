@@ -4,6 +4,11 @@ package dialog;
 
 option go_package = "./rpc/";
 
+service Dialog{
+  rpc Listen(Info) returns (stream Value);
+  rpc StopListen(Empty) returns (stream Empty);
+}
+
 message Info {
   string name = 1;
   string password = 2;
@@ -14,7 +19,4 @@ message Value {
   int64 index = 1;
 }
 
-service Dialog{
-  rpc AuthAndListen(Info) returns (stream Value);
-}
-
+message Empty{}

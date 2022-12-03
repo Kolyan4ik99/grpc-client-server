@@ -22,7 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DialogClient interface {
-	AuthAndListen(ctx context.Context, in *Info, opts ...grpc.CallOption) (Dialog_AuthAndListenClient, error)
+	Listen(ctx context.Context, in *Info, opts ...grpc.CallOption) (Dialog_ListenClient, error)
+	StopListen(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Dialog_StopListenClient, error)
 }
 
 type dialogClient struct {
@@ -33,12 +34,12 @@ func NewDialogClient(cc grpc.ClientConnInterface) DialogClient {
 	return &dialogClient{cc}
 }
 
-func (c *dialogClient) AuthAndListen(ctx context.Context, in *Info, opts ...grpc.CallOption) (Dialog_AuthAndListenClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Dialog_ServiceDesc.Streams[0], "/dialog.Dialog/AuthAndListen", opts...)
+func (c *dialogClient) Listen(ctx context.Context, in *Info, opts ...grpc.CallOption) (Dialog_ListenClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Dialog_ServiceDesc.Streams[0], "/dialog.Dialog/Listen", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &dialogAuthAndListenClient{stream}
+	x := &dialogListenClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -48,17 +49,49 @@ func (c *dialogClient) AuthAndListen(ctx context.Context, in *Info, opts ...grpc
 	return x, nil
 }
 
-type Dialog_AuthAndListenClient interface {
+type Dialog_ListenClient interface {
 	Recv() (*Value, error)
 	grpc.ClientStream
 }
 
-type dialogAuthAndListenClient struct {
+type dialogListenClient struct {
 	grpc.ClientStream
 }
 
-func (x *dialogAuthAndListenClient) Recv() (*Value, error) {
+func (x *dialogListenClient) Recv() (*Value, error) {
 	m := new(Value)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *dialogClient) StopListen(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Dialog_StopListenClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Dialog_ServiceDesc.Streams[1], "/dialog.Dialog/StopListen", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &dialogStopListenClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Dialog_StopListenClient interface {
+	Recv() (*Empty, error)
+	grpc.ClientStream
+}
+
+type dialogStopListenClient struct {
+	grpc.ClientStream
+}
+
+func (x *dialogStopListenClient) Recv() (*Empty, error) {
+	m := new(Empty)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -69,15 +102,19 @@ func (x *dialogAuthAndListenClient) Recv() (*Value, error) {
 // All implementations should embed UnimplementedDialogServer
 // for forward compatibility
 type DialogServer interface {
-	AuthAndListen(*Info, Dialog_AuthAndListenServer) error
+	Listen(*Info, Dialog_ListenServer) error
+	StopListen(*Empty, Dialog_StopListenServer) error
 }
 
 // UnimplementedDialogServer should be embedded to have forward compatible implementations.
 type UnimplementedDialogServer struct {
 }
 
-func (UnimplementedDialogServer) AuthAndListen(*Info, Dialog_AuthAndListenServer) error {
-	return status.Errorf(codes.Unimplemented, "method AuthAndListen not implemented")
+func (UnimplementedDialogServer) Listen(*Info, Dialog_ListenServer) error {
+	return status.Errorf(codes.Unimplemented, "method Listen not implemented")
+}
+func (UnimplementedDialogServer) StopListen(*Empty, Dialog_StopListenServer) error {
+	return status.Errorf(codes.Unimplemented, "method StopListen not implemented")
 }
 
 // UnsafeDialogServer may be embedded to opt out of forward compatibility for this service.
@@ -91,24 +128,45 @@ func RegisterDialogServer(s grpc.ServiceRegistrar, srv DialogServer) {
 	s.RegisterService(&Dialog_ServiceDesc, srv)
 }
 
-func _Dialog_AuthAndListen_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _Dialog_Listen_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(Info)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DialogServer).AuthAndListen(m, &dialogAuthAndListenServer{stream})
+	return srv.(DialogServer).Listen(m, &dialogListenServer{stream})
 }
 
-type Dialog_AuthAndListenServer interface {
+type Dialog_ListenServer interface {
 	Send(*Value) error
 	grpc.ServerStream
 }
 
-type dialogAuthAndListenServer struct {
+type dialogListenServer struct {
 	grpc.ServerStream
 }
 
-func (x *dialogAuthAndListenServer) Send(m *Value) error {
+func (x *dialogListenServer) Send(m *Value) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Dialog_StopListen_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DialogServer).StopListen(m, &dialogStopListenServer{stream})
+}
+
+type Dialog_StopListenServer interface {
+	Send(*Empty) error
+	grpc.ServerStream
+}
+
+type dialogStopListenServer struct {
+	grpc.ServerStream
+}
+
+func (x *dialogStopListenServer) Send(m *Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -121,8 +179,13 @@ var Dialog_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "AuthAndListen",
-			Handler:       _Dialog_AuthAndListen_Handler,
+			StreamName:    "Listen",
+			Handler:       _Dialog_Listen_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StopListen",
+			Handler:       _Dialog_StopListen_Handler,
 			ServerStreams: true,
 		},
 	},
