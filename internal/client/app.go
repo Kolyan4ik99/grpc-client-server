@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -38,21 +37,14 @@ func (a *App) Start() error {
 	dialClient := rpc.NewDialogClient(dial)
 	log.Printf("Connection to server [%s]\n", a.cfg.ServerURL)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	go a.stopConnectionAfterTime(dialClient)
+
+	func() {
 		err := a.listenAndPutToBuffer(dialClient)
 		if err != nil {
 			log.Println(err)
 		}
 	}()
-
-	_, err = a.stopConnection(dialClient)
-	if err != nil {
-		return err
-	}
-	wg.Wait()
 
 	return nil
 }
@@ -78,9 +70,12 @@ func (a *App) listenAndPutToBuffer(client rpc.DialogClient) error {
 	}
 }
 
-func (a *App) stopConnection(client rpc.DialogClient) (rpc.Dialog_StopListenClient, error) {
+func (a *App) stopConnectionAfterTime(client rpc.DialogClient) {
 	log.Printf("Wait %s to stop connection", a.cfg.DialDeadline)
 	time.Sleep(a.cfg.DialDeadline)
 	log.Println("Connection successfully stopped")
-	return client.StopListen(context.Background(), &rpc.Empty{})
+	_, err := client.StopListen(context.Background(), &rpc.Empty{})
+	if err != nil {
+		log.Println(err)
+	}
 }
